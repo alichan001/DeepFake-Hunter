@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Deepfake Hunter — Deepfake Detection</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:          #080a10;
+  --bg2:         #0d1018;
+  --surface:     #111520;
+  --surface2:    #181d2a;
+  --surface3:    #1f2535;
+  --border:      rgba(255,255,255,0.06);
+  --border2:     rgba(255,255,255,0.11);
+  --border3:     rgba(255,255,255,0.18);
+  --text:        #e2e6f0;
+  --text2:       #a0a8be;
+  --muted:       #5c6480;
+  --blue:        #3b82f6;
+  --blue2:       #60a5fa;
+  --blue-glow:   rgba(59,130,246,0.15);
+  --blue-dim:    rgba(59,130,246,0.08);
+  --green:       #22c55e;
+  --green-glow:  rgba(34,197,94,0.15);
+  --green-dim:   rgba(34,197,94,0.08);
+  --red:         #ef4444;
+  --red-glow:    rgba(239,68,68,0.15);
+  --red-dim:     rgba(239,68,68,0.08);
+  --amber:       #f59e0b;
+  --amber-dim:   rgba(245,158,11,0.08);
+  --purple:      #8b5cf6;
+  --purple-dim:  rgba(139,92,246,0.08);
+  --teal:        #14b8a6;
+  --r:           14px;
+  --r-sm:        8px;
+  --r-lg:        20px;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ─── BACKGROUND GRID ─────────────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(59,130,246,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59,130,246,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ─── TOP NAV ─────────────────────────────────────────────── */
+.topnav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(8,10,16,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 2rem;
+  height: 56px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.nav-brand {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 15px; font-weight: 600; color: var(--text);
+  text-decoration: none;
+}
+.nav-logo {
+  width: 30px; height: 30px;
+  background: linear-gradient(135deg, var(--blue), var(--purple));
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+}
+.nav-badge {
+  font-size: 10px; font-weight: 500;
+  padding: 2px 7px; border-radius: 100px;
+  background: var(--blue-dim); color: var(--blue2);
+  border: 1px solid rgba(59,130,246,0.2);
+}
+.nav-status {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 12px; color: var(--muted);
+}
+.status-pip {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--amber);
+  box-shadow: 0 0 6px var(--amber);
+  transition: background 0.3s, box-shadow 0.3s;
+}
+.status-pip.online  { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.status-pip.offline { background: var(--red);   box-shadow: 0 0 8px var(--red); }
+
+/* ─── LAYOUT ──────────────────────────────────────────────── */
+.page { position: relative; z-index: 1; }
+.container { max-width: 900px; margin: 0 auto; padding: 3rem 1.5rem 5rem; }
+
+/* ─── HERO ────────────────────────────────────────────────── */
+.hero { text-align: center; margin-bottom: 3rem; }
+.hero-eyebrow {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--blue2); margin-bottom: 1rem;
+  padding: 4px 12px; border-radius: 100px;
+  background: var(--blue-dim); border: 1px solid rgba(59,130,246,0.2);
+}
+.hero h1 {
+  font-size: clamp(26px, 4vw, 38px);
+  font-weight: 700; letter-spacing: -1px; line-height: 1.15;
+  color: var(--text); margin-bottom: 1rem;
+}
+.hero h1 .grad {
+  background: linear-gradient(135deg, var(--blue2), var(--purple));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.hero p {
+  font-size: 15px; color: var(--text2); max-width: 520px; margin: 0 auto;
+  line-height: 1.7;
+}
+.hero-tags {
+  display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+  margin-top: 1.25rem;
+}
+.hero-tag {
+  font-size: 11px; padding: 3px 10px; border-radius: 100px;
+  background: var(--surface2); color: var(--text2);
+  border: 1px solid var(--border2);
+}
+
+/* ─── UPLOAD AREA ─────────────────────────────────────────── */
+.upload-area {
+  position: relative;
+  border: 1.5px dashed var(--border3);
+  border-radius: var(--r-lg);
+  padding: 3.5rem 2rem;
+  text-align: center;
+  background: var(--surface);
+  transition: border-color 0.2s, background 0.2s, transform 0.15s;
+  margin-bottom: 1rem;
+  cursor: default;
+}
+.upload-area.dragover {
+  border-color: var(--blue);
+  background: var(--blue-dim);
+  transform: scale(1.005);
+}
+.upload-area.has-file {
+  padding: 1.5rem 2rem;
+  border-style: solid;
+  border-color: var(--border2);
+}
+.upload-glow {
+  position: absolute; inset: -1px; border-radius: var(--r-lg);
+  background: linear-gradient(135deg, rgba(59,130,246,0.06), rgba(139,92,246,0.06));
+  pointer-events: none;
+}
+.upload-icon-wrap {
+  width: 64px; height: 64px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--blue-dim), var(--purple-dim));
+  border: 1px solid rgba(59,130,246,0.2);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 1.25rem; font-size: 26px;
+  transition: transform 0.2s;
+}
+.upload-area:not(.has-file):hover .upload-icon-wrap { transform: scale(1.08); }
+.upload-area h3 { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+.upload-area > p { font-size: 13px; color: var(--text2); margin-bottom: 1.5rem; }
+.upload-formats {
+  display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+.fmt-pill {
+  font-size: 11px; padding: 2px 8px; border-radius: 4px;
+  background: var(--surface3); color: var(--muted); border: 1px solid var(--border);
+  font-family: monospace;
+}
+
+/* browse button — this is the ONLY thing that triggers file input */
+.browse-btn {
+  padding: 10px 24px;
+  background: var(--blue);
+  color: #fff; border: none;
+  border-radius: var(--r-sm);
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+  box-shadow: 0 4px 14px rgba(59,130,246,0.3);
+}
+.browse-btn:hover {
+  background: #2563eb;
+  box-shadow: 0 6px 20px rgba(59,130,246,0.4);
+  transform: translateY(-1px);
+}
+.browse-btn:active { transform: translateY(0); }
+#fileInput { display: none; }
+
+/* ─── FILE SELECTED STATE ─────────────────────────────────── */
+.file-selected-view { display: none; }
+.file-info-row {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface2); border-radius: var(--r-sm);
+  padding: 12px 16px; margin-bottom: 1rem;
+  border: 1px solid var(--border2);
+}
+.file-icon-box {
+  width: 40px; height: 40px; border-radius: 8px;
+  background: var(--blue-dim); border: 1px solid rgba(59,130,246,0.2);
+  display: flex; align-items: center; justify-content: center; font-size: 18px;
+  flex-shrink: 0;
+}
+.file-meta { flex: 1; overflow: hidden; }
+.file-name-text {
+  font-size: 13px; font-weight: 500; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.file-size-text { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.file-clear {
+  width: 28px; height: 28px; border-radius: 6px;
+  background: none; border: 1px solid var(--border2);
+  color: var(--muted); cursor: pointer; font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s; flex-shrink: 0;
+}
+.file-clear:hover { background: var(--red-dim); color: var(--red); border-color: var(--red); }
+
+/* ─── ANALYZE BUTTON ──────────────────────────────────────── */
+.analyze-btn {
+  width: 100%; padding: 14px;
+  background: linear-gradient(135deg, var(--blue), #4f46e5);
+  color: #fff; border: none; border-radius: var(--r-sm);
+  font-size: 15px; font-weight: 600; cursor: pointer;
+  box-shadow: 0 6px 24px rgba(59,130,246,0.35);
+  transition: opacity 0.15s, transform 0.1s, box-shadow 0.15s;
+  display: none; margin-bottom: 1.5rem; letter-spacing: 0.01em;
+}
+.analyze-btn:hover:not(:disabled) {
+  opacity: 0.9; transform: translateY(-1px);
+  box-shadow: 0 8px 30px rgba(59,130,246,0.45);
+}
+.analyze-btn:active { transform: translateY(0); }
+.analyze-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ─── ERROR BOX ───────────────────────────────────────────── */
+.error-box {
+  display: none;
+  background: var(--red-dim); border: 1px solid rgba(239,68,68,0.3);
+  border-radius: var(--r-sm); padding: 12px 16px;
+  font-size: 13px; color: var(--red); margin-bottom: 1rem;
+  display: flex; align-items: flex-start; gap: 8px;
+}
+.error-box { display: none; }
+
+/* ─── PROGRESS ────────────────────────────────────────────── */
+.progress-section { display: none; margin-bottom: 1.5rem; }
+.progress-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.progress-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.progress-pct   { font-size: 12px; color: var(--blue2); font-weight: 500; }
+.progress-track {
+  height: 3px; background: var(--surface3); border-radius: 2px;
+  overflow: hidden; margin-bottom: 1.25rem;
+}
+.progress-fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--blue), var(--purple));
+  border-radius: 2px; transition: width 0.4s ease;
+}
+.stages { display: flex; flex-direction: column; gap: 6px; }
+.stage-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 13px; transition: all 0.2s;
+}
+.stage-row.s-active { border-color: rgba(59,130,246,0.4); background: var(--blue-dim); }
+.stage-row.s-done   { border-color: rgba(34,197,94,0.3);  background: var(--green-dim); }
+.stage-row.s-error  { border-color: rgba(239,68,68,0.3);  background: var(--red-dim); }
+.s-num {
+  width: 22px; height: 22px; border-radius: 50%; font-size: 10px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface3); color: var(--muted); flex-shrink: 0;
+  transition: all 0.2s;
+}
+.s-active .s-num { background: var(--blue);  color: #fff; animation: spinPulse 1.2s infinite; }
+.s-done   .s-num { background: var(--green); color: #fff; }
+.s-error  .s-num { background: var(--red);   color: #fff; }
+.s-label { flex: 1; color: var(--text2); transition: color 0.2s; }
+.s-active .s-label { color: var(--blue2); }
+.s-done   .s-label { color: var(--green); }
+@keyframes spinPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.6;transform:scale(0.9)} }
+
+/* ─── RESULTS ─────────────────────────────────────────────── */
+.results-section { display: none; }
+
+/* verdict */
+.verdict-wrap {
+  border-radius: var(--r-lg); padding: 1.75rem;
+  margin-bottom: 1.25rem; border: 1px solid var(--border2);
+  background: var(--surface); position: relative; overflow: hidden;
+}
+.verdict-wrap::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(135deg, transparent 60%, rgba(59,130,246,0.04));
+  pointer-events: none;
+}
+.verdict-wrap.v-fake { border-color: rgba(239,68,68,0.35); }
+.verdict-wrap.v-fake::before { background: linear-gradient(135deg, transparent 50%, rgba(239,68,68,0.06)); }
+.verdict-wrap.v-real { border-color: rgba(34,197,94,0.35); }
+.verdict-wrap.v-real::before { background: linear-gradient(135deg, transparent 50%, rgba(34,197,94,0.06)); }
+
+.verdict-top { display: flex; align-items: center; gap: 14px; margin-bottom: 1.25rem; }
+.v-icon {
+  width: 48px; height: 48px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center; font-size: 22px;
+  flex-shrink: 0;
+}
+.v-fake .v-icon { background: var(--red-dim); border: 1px solid rgba(239,68,68,0.3); }
+.v-real .v-icon { background: var(--green-dim); border: 1px solid rgba(34,197,94,0.3); }
+.v-text {}
+.v-badge {
+  display: inline-block; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.12em; padding: 3px 10px; border-radius: 100px;
+  margin-bottom: 4px;
+}
+.v-fake .v-badge { background: var(--red);   color: #fff; }
+.v-real .v-badge { background: var(--green); color: #fff; }
+.v-title { font-size: 17px; font-weight: 600; color: var(--text); }
+
+.conf-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.conf-lbl { font-size: 12px; color: var(--muted); }
+.conf-num { font-size: 13px; font-weight: 700; }
+.v-fake .conf-num { color: var(--red); }
+.v-real .conf-num { color: var(--green); }
+.conf-track { height: 6px; background: var(--surface3); border-radius: 3px; overflow: hidden; margin-bottom: 1.25rem; }
+.conf-bar { height: 100%; border-radius: 3px; width: 0%; transition: width 1.2s cubic-bezier(0.34,1.56,0.64,1); }
+.v-fake .conf-bar { background: linear-gradient(90deg, #b91c1c, var(--red)); }
+.v-real .conf-bar { background: linear-gradient(90deg, #15803d, var(--green)); }
+
+.why-box {
+  background: rgba(0,0,0,0.25); border-radius: var(--r-sm);
+  padding: 12px 14px; font-size: 13px; line-height: 1.65;
+  border: 1px solid var(--border);
+}
+.why-label {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 5px;
+}
+.why-text { color: var(--text2); }
+
+/* ─── SCORE GRID ──────────────────────────────────────────── */
+.score-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 1px; background: var(--border);
+  border-radius: var(--r); overflow: hidden;
+  margin-bottom: 1.25rem;
+}
+.score-cell {
+  background: var(--surface); padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.sc-label { font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+.sc-value { font-size: 20px; font-weight: 700; color: var(--text); }
+.sc-sub   { font-size: 11px; color: var(--muted); }
+
+/* ─── SIGNALS ─────────────────────────────────────────────── */
+.signals-wrap {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); overflow: hidden; margin-bottom: 1.25rem;
+}
+.signals-head {
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--muted);
+  display: flex; align-items: center; gap: 8px;
+}
+.sig-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 16px; border-bottom: 1px solid var(--border);
+  font-size: 13px; transition: background 0.15s;
+}
+.sig-row:last-child { border-bottom: none; }
+.sig-row:hover { background: var(--surface2); }
+.sig-indicator {
+  width: 3px; height: 32px; border-radius: 2px; flex-shrink: 0;
+}
+.si-ok     { background: var(--green); }
+.si-warning{ background: var(--amber); }
+.si-danger { background: var(--red); }
+.sig-body  { flex: 1; overflow: hidden; }
+.sig-name  { font-weight: 500; color: var(--text); }
+.sig-desc  { font-size: 11px; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sig-chip {
+  font-size: 11px; font-weight: 600; padding: 3px 9px;
+  border-radius: 100px; flex-shrink: 0; white-space: nowrap;
+}
+.sc-ok      { background: var(--green-dim); color: var(--green); border: 1px solid rgba(34,197,94,0.2); }
+.sc-warning { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(245,158,11,0.2); }
+.sc-danger  { background: var(--red-dim);   color: var(--red);   border: 1px solid rgba(239,68,68,0.2); }
+
+/* ─── CHARTS ──────────────────────────────────────────────── */
+.charts-section { margin-bottom: 1.25rem; }
+.charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media(max-width:640px){ .charts-grid { grid-template-columns: 1fr; } }
+.chart-panel {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 14px 16px;
+}
+.chart-panel.wide { grid-column: 1 / -1; }
+.chart-head { margin-bottom: 12px; }
+.chart-name { font-size: 12px; font-weight: 600; color: var(--text); }
+.chart-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.chart-canvas { position: relative; }
+
+/* ─── META BAR ────────────────────────────────────────────── */
+.meta-bar {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 1px; background: var(--border);
+  border-radius: var(--r); overflow: hidden; margin-bottom: 1.25rem;
+}
+@media(max-width:520px){ .meta-bar { grid-template-columns: repeat(2,1fr); } }
+.meta-cell { background: var(--surface); padding: 12px 14px; }
+.meta-lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; }
+.meta-val { font-size: 18px; font-weight: 700; color: var(--text); margin-top: 2px; }
+.meta-unit { font-size: 10px; color: var(--muted); margin-left: 2px; font-weight: 400; }
+
+/* ─── RESET ───────────────────────────────────────────────── */
+.reset-row { text-align: center; }
+.dl-btn {
+  padding: 10px 28px;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  color: #fff; border: none;
+  border-radius: var(--r-sm);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  box-shadow: 0 4px 14px rgba(59,130,246,0.3);
+  transition: opacity 0.15s, transform 0.1s;
+  margin-right: 10px;
+}
+.dl-btn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+.dl-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.dl-btn.loading { opacity: 0.7; cursor: wait; }
+.reset-btn {
+  padding: 10px 28px;
+  background: transparent; border: 1px solid var(--border3);
+  border-radius: var(--r-sm); color: var(--text2);
+  font-size: 13px; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.reset-btn:hover { background: var(--surface2); border-color: var(--blue); color: var(--blue2); }
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<nav class="topnav">
+  <a class="nav-brand" href="#">
+    <div class="nav-logo">🛡</div>
+    Deepfake Hunter
+    <span class="nav-badge">FYP</span>
+  </a>
+  <div class="nav-status">
+    <div class="status-pip" id="statusPip"></div>
+    <span id="statusText">Checking server…</span>
+  </div>
+</nav>
+
+<div class="page">
+<div class="container">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-eyebrow">⚡ Physiological Signal Analysis</div>
+    <h1>Detect <span class="grad">Deepfake Videos</span><br>with Biological Signals</h1>
+    <p>Analyzes blink patterns, eye movement entropy, remote heartbeat (rPPG), microsaccades, frequency artifacts, and facial geometry — all without AI models.</p>
+    <div class="hero-tags">
+      <span class="hero-tag">🫀 rPPG Heartbeat</span>
+      <span class="hero-tag">👁 Blink Rate</span>
+      <span class="hero-tag">〰 Microsaccades</span>
+      <span class="hero-tag">📡 Fourier Analysis</span>
+      <span class="hero-tag">📐 Geometry</span>
+      <span class="hero-tag">🔒 100% Offline</span>
+    </div>
+  </div>
+
+  <!-- ERROR -->
+  <div class="error-box" id="errorBox"></div>
+
+  <!-- UPLOAD AREA -->
+  <div class="upload-area" id="uploadArea">
+    <div class="upload-glow"></div>
+    <div class="upload-icon-wrap" id="uploadIconWrap">🎬</div>
+    <h3>Drop your video here</h3>
+    <p>or click Browse to select a file from your device</p>
+    <div class="upload-formats">
+      <span class="fmt-pill">.mp4</span>
+      <span class="fmt-pill">.avi</span>
+      <span class="fmt-pill">.mov</span>
+      <span class="fmt-pill">.mkv</span>
+      <span class="fmt-pill">.webm</span>
+    </div>
+    <!-- ✅ FIX: button calls openFilePicker(), zone click does NOT trigger file input -->
+    <button class="browse-btn" id="browseBtn" type="button">Browse Files</button>
+    <input type="file" id="fileInput" accept="video/*"/>
+  </div>
+
+  <!-- FILE SELECTED (shown inside upload-area via JS) -->
+  <div class="file-info-row" id="fileInfoRow" style="display:none;">
+    <div class="file-icon-box">🎬</div>
+    <div class="file-meta">
+      <div class="file-name-text" id="fileNameTxt">—</div>
+      <div class="file-size-text" id="fileSizeTxt">—</div>
+    </div>
+    <button class="file-clear" id="fileClearBtn" type="button" title="Remove">✕</button>
+  </div>
+
+  <!-- ANALYZE BUTTON -->
+  <button class="analyze-btn" id="analyzeBtn" type="button">
+    🔍&nbsp; Analyze Video
+  </button>
+
+  <!-- PROGRESS -->
+  <div class="progress-section" id="progressSection">
+    <div class="progress-header">
+      <div class="progress-title">Running analysis pipeline…</div>
+      <div class="progress-pct" id="progressPct">0%</div>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="stages" id="stageList"></div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="results-section" id="resultsSection">
+
+    <!-- Verdict -->
+    <div class="verdict-wrap" id="verdictWrap">
+      <div class="verdict-top">
+        <div class="v-icon" id="vIcon">—</div>
+        <div class="v-text">
+          <div class="v-badge" id="vBadge">—</div>
+          <div class="v-title" id="vTitle">—</div>
+        </div>
+      </div>
+      <div class="conf-row">
+        <span class="conf-lbl">Confidence score</span>
+        <span class="conf-num" id="confNum">—</span>
+      </div>
+      <div class="conf-track"><div class="conf-bar" id="confBar"></div></div>
+      <div class="why-box">
+        <div class="why-label">Why this verdict?</div>
+        <div class="why-text" id="whyText">—</div>
+      </div>
+    </div>
+
+    <!-- Score cells -->
+    <div class="score-grid" id="scoreGrid"></div>
+
+    <!-- Signal breakdown -->
+    <div class="signals-wrap">
+      <div class="signals-head">
+        <span>📊</span> Signal Breakdown — 6 analyzers
+      </div>
+      <div id="signalRows"></div>
+    </div>
+
+    <!-- Meta bar -->
+    <div class="meta-bar" id="metaBar"></div>
+
+    <!-- Charts -->
+    <div class="charts-section">
+      <div class="charts-grid">
+        <div class="chart-panel">
+          <div class="chart-head">
+            <div class="chart-name">Blink Timeline</div>
+            <div class="chart-desc">Blinks per 5-second window</div>
+          </div>
+          <div class="chart-canvas" style="height:150px"><canvas id="blinkChart"></canvas></div>
+        </div>
+        <div class="chart-panel">
+          <div class="chart-head">
+            <div class="chart-name">Eye Movement (Gaze X)</div>
+            <div class="chart-desc">Horizontal gaze displacement over time</div>
+          </div>
+          <div class="chart-canvas" style="height:150px"><canvas id="eyeChart"></canvas></div>
+        </div>
+        <div class="chart-panel wide">
+          <div class="chart-head">
+            <div class="chart-name">rPPG Heart Signal</div>
+            <div class="chart-desc">Remote heartbeat extracted from facial skin color variation</div>
+          </div>
+          <div class="chart-canvas" style="height:150px"><canvas id="hrChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reset -->
+    <div class="reset-row">
+      <button class="dl-btn" id="downloadBtn" type="button">⬇ &nbsp;Download PDF Report</button>
+      <button class="reset-btn" id="resetBtn" type="button">↺ &nbsp;Analyze Another Video</button>
+    </div>
+
+  </div><!-- /results -->
+
+</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════════════════════
+const API_BASE = 'http://127.0.0.1:5000';
+
+// ═══════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════
+let selectedFile = null;
+let blinkChart, eyeChart, hrChart;
+let lastResult   = null;    // store last analysis result for PDF export
+let lastFilename = '';
+
+// ═══════════════════════════════════════════════════════════
+//  ELEMENTS
+// ═══════════════════════════════════════════════════════════
+const fileInput    = document.getElementById('fileInput');
+const browseBtn    = document.getElementById('browseBtn');
+const uploadArea   = document.getElementById('uploadArea');
+const fileInfoRow  = document.getElementById('fileInfoRow');
+const fileClearBtn = document.getElementById('fileClearBtn');
+const analyzeBtn   = document.getElementById('analyzeBtn');
+const resetBtn     = document.getElementById('resetBtn');
+const downloadBtn  = document.getElementById('downloadBtn');
+
+// ═══════════════════════════════════════════════════════════
+//  ✅ FIX: UPLOAD BUG
+//  - browseBtn ONLY opens file picker (stopPropagation prevents
+//    the click from also bubbling to uploadArea)
+//  - uploadArea click does NOT call fileInput.click() at all
+//    (drag-and-drop still works separately)
+//  - fileInput.value is reset before opening, so re-selecting
+//    the same file always triggers the 'change' event
+// ═══════════════════════════════════════════════════════════
+function openFilePicker(e) {
+  e.stopPropagation();          // don't bubble to uploadArea
+  fileInput.value = '';         // reset so same file re-triggers change
+  fileInput.click();
+}
+browseBtn.addEventListener('click', openFilePicker);
+
+// drag-and-drop
+uploadArea.addEventListener('dragover',  e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+uploadArea.addEventListener('dragleave', e => { if (!uploadArea.contains(e.relatedTarget)) uploadArea.classList.remove('dragover'); });
+uploadArea.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadArea.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('video/')) setFile(f);
+  else showError('Please drop a valid video file.');
+});
+
+// file chosen from dialog
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) setFile(e.target.files[0]);
+});
+
+// clear
+fileClearBtn.addEventListener('click', clearFile);
+
+// analyze
+analyzeBtn.addEventListener('click', startAnalysis);
+
+// reset
+resetBtn.addEventListener('click', resetAll);
+downloadBtn.addEventListener('click', downloadPDF);
+
+// ─── set file ──────────────────────────────────────────────
+function setFile(file) {
+  selectedFile = file;
+  document.getElementById('fileNameTxt').textContent = file.name;
+  document.getElementById('fileSizeTxt').textContent = formatBytes(file.size);
+
+  // swap upload zone content to show file info
+  uploadArea.querySelector('.upload-icon-wrap').style.display = 'none';
+  uploadArea.querySelector('h3').style.display = 'none';
+  uploadArea.querySelector('p').style.display  = 'none';
+  uploadArea.querySelector('.upload-formats').style.display = 'none';
+  browseBtn.style.display = 'none';
+  fileInfoRow.style.display = 'flex';
+  uploadArea.classList.add('has-file');
+
+  analyzeBtn.style.display = 'block';
+  hideError();
+}
+
+function clearFile() {
+  selectedFile = null;
+  lastResult   = null;
+  lastFilename = '';
+  fileInput.value = '';
+  fileInfoRow.style.display = 'none';
+  uploadArea.querySelector('.upload-icon-wrap').style.display = 'flex';
+  uploadArea.querySelector('h3').style.display  = '';
+  uploadArea.querySelector('p').style.display   = '';
+  uploadArea.querySelector('.upload-formats').style.display = 'flex';
+  browseBtn.style.display = '';
+  uploadArea.classList.remove('has-file');
+  analyzeBtn.style.display = 'none';
+  hideError();
+}
+
+function formatBytes(b) {
+  if (b < 1024)     return b + ' B';
+  if (b < 1048576)  return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(1) + ' MB';
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SERVER HEALTH CHECK
+// ═══════════════════════════════════════════════════════════
+async function checkServer() {
+  const pip  = document.getElementById('statusPip');
+  const txt  = document.getElementById('statusText');
+  try {
+    const r = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(3000) });
+    const d = await r.json();
+    if (d.status === 'ok') {
+      pip.className = 'status-pip online';
+      txt.textContent = 'Server online — ready';
+    }
+  } catch {
+    pip.className = 'status-pip offline';
+    txt.textContent = 'Server offline — run: python main_v2.py --server';
+  }
+}
+checkServer();
+setInterval(checkServer, 10000);
+
+// ═══════════════════════════════════════════════════════════
+//  STAGES
+// ═══════════════════════════════════════════════════════════
+const STAGES = [
+  { id:'face',    label:'Face detection & landmark extraction' },
+  { id:'blink',   label:'Blink rate analysis (EAR method)' },
+  { id:'eye',     label:'Eye movement entropy analysis' },
+  { id:'rppg',    label:'rPPG heartbeat extraction' },
+  { id:'micro',   label:'Microsaccade frequency analysis' },
+  { id:'fourier', label:'Fourier frequency artifact detection' },
+  { id:'geom',    label:'Facial geometry consistency check' },
+  { id:'verdict', label:'Bayesian signal fusion & verdict' },
+];
+
+function buildStages() {
+  const list = document.getElementById('stageList');
+  list.innerHTML = '';
+  STAGES.forEach((s, i) => {
+    list.innerHTML += `
+      <div class="stage-row" id="sr-${s.id}">
+        <div class="s-num" id="sn-${s.id}">${i+1}</div>
+        <div class="s-label">${s.label}</div>
+      </div>`;
+  });
+}
+
+function setStage(id, state) {
+  const row = document.getElementById(`sr-${id}`);
+  const num = document.getElementById(`sn-${id}`);
+  if (!row) return;
+  row.className = `stage-row s-${state}`;
+  if (state === 'active') num.textContent = '●';
+  if (state === 'done')   num.textContent = '✓';
+  if (state === 'error')  num.textContent = '✗';
+}
+
+// ═══════════════════════════════════════════════════════════
+//  MAIN ANALYSIS
+// ═══════════════════════════════════════════════════════════
+async function startAnalysis() {
+  if (!selectedFile) return;
+
+  analyzeBtn.disabled    = true;
+  analyzeBtn.textContent = '⏳  Analyzing…';
+  hideError();
+
+  uploadArea.style.display      = 'none';
+  fileInfoRow.style.display     = 'none';
+  analyzeBtn.style.display      = 'none';
+  document.getElementById('progressSection').style.display = 'block';
+  buildStages();
+
+  // Animate stages
+  const ids  = STAGES.map(s => s.id);
+  const durs = [700, 500, 500, 800, 600, 600, 500, 400];
+  let delay  = 0;
+  const timers = [];
+  ids.forEach((id, i) => {
+    timers.push(setTimeout(() => setStage(id, 'active'), delay));
+    delay += durs[i];
+  });
+
+  // Progress bar
+  let pct = 0;
+  const pctEl  = document.getElementById('progressPct');
+  const fillEl = document.getElementById('progressFill');
+  const pInt = setInterval(() => {
+    pct = Math.min(pct + 1, 88);
+    fillEl.style.width = pct + '%';
+    pctEl.textContent  = pct + '%';
+  }, 180);
+
+  try {
+    const fd = new FormData();
+    fd.append('video', selectedFile);
+
+    const res = await fetch(`${API_BASE}/analyze`, { method:'POST', body:fd });
+
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(e.error || `Server error ${res.status}`);
+    }
+
+    const data = await res.json();
+
+    clearInterval(pInt);
+    timers.forEach(t => clearTimeout(t));
+    fillEl.style.width = '100%';
+    pctEl.textContent  = '100%';
+    ids.forEach(id => setStage(id, 'done'));
+
+    setTimeout(() => showResults(data), 500);
+
+  } catch (err) {
+    clearInterval(pInt);
+    timers.forEach(t => clearTimeout(t));
+    ids.forEach(id => setStage(id, 'error'));
+    showError('Analysis failed: ' + err.message);
+    analyzeBtn.disabled    = false;
+    analyzeBtn.textContent = '🔍  Analyze Video';
+    analyzeBtn.style.display = 'block';
+    uploadArea.style.display = 'block';
+    fileInfoRow.style.display = selectedFile ? 'flex' : 'none';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SHOW RESULTS
+// ═══════════════════════════════════════════════════════════
+function showResults(data) {
+  lastResult   = data;
+  lastFilename = selectedFile ? selectedFile.name : 'video.mp4';
+  document.getElementById('progressSection').style.display = 'none';
+  document.getElementById('resultsSection').style.display  = 'block';
+
+  const fake = data.verdict === 'FAKE';
+
+  // Verdict
+  const wrap = document.getElementById('verdictWrap');
+  wrap.className = `verdict-wrap ${fake ? 'v-fake' : 'v-real'}`;
+  document.getElementById('vIcon').textContent   = fake ? '⚠️' : '✅';
+  document.getElementById('vBadge').textContent  = data.verdict;
+  document.getElementById('vTitle').textContent  = fake
+    ? 'This video is likely AI-generated or manipulated'
+    : 'This video shows genuine physiological activity';
+  document.getElementById('confNum').textContent = data.confidence + '%';
+  document.getElementById('whyText').textContent = data.explanation;
+  setTimeout(() => {
+    document.getElementById('confBar').style.width = data.confidence + '%';
+  }, 100);
+
+  // Score grid
+  const sig = data.signals || {};
+  const meta= data.meta || {};
+  document.getElementById('scoreGrid').innerHTML = `
+    <div class="score-cell">
+      <div class="sc-label">Confidence</div>
+      <div class="sc-value">${data.confidence}<span class="sc-sub">%</span></div>
+      <div class="sc-sub">${data.verdict}</div>
+    </div>
+    <div class="score-cell">
+      <div class="sc-label">Blink Rate</div>
+      <div class="sc-value">${sig.blink_rate ?? '—'}<span class="sc-sub"> /min</span></div>
+      <div class="sc-sub">normal: 10–25</div>
+    </div>
+    <div class="score-cell">
+      <div class="sc-label">Heart Rate</div>
+      <div class="sc-value">${sig.heart_rate ?? 'N/D'}<span class="sc-sub"> bpm</span></div>
+      <div class="sc-sub">${sig.has_heartbeat ? 'detected' : 'no signal'}</div>
+    </div>`;
+
+  // Signal rows
+  const rowsEl = document.getElementById('signalRows');
+  rowsEl.innerHTML = '';
+  (data.evidence || []).forEach(r => {
+    rowsEl.innerHTML += `
+      <div class="sig-row">
+        <div class="sig-indicator si-${r.status}"></div>
+        <div class="sig-body">
+          <div class="sig-name">${r.signal}</div>
+          <div class="sig-desc">${r.message}</div>
+        </div>
+        <span class="sig-chip sc-${r.status}">${r.value}</span>
+      </div>`;
+  });
+
+  // Meta bar
+  document.getElementById('metaBar').innerHTML = `
+    <div class="meta-cell"><div class="meta-lbl">FPS</div><div class="meta-val">${(meta.fps||0).toFixed(1)}</div></div>
+    <div class="meta-cell"><div class="meta-lbl">Frames</div><div class="meta-val">${meta.total_frames||'—'}</div></div>
+    <div class="meta-cell"><div class="meta-lbl">Face Detection</div><div class="meta-val">${((meta.face_detection_rate||0)*100).toFixed(0)}<span class="meta-unit">%</span></div></div>
+    <div class="meta-cell"><div class="meta-lbl">Process Time</div><div class="meta-val">${meta.processing_time_sec||'—'}<span class="meta-unit">s</span></div></div>`;
+
+  renderCharts(sig);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CHARTS
+// ═══════════════════════════════════════════════════════════
+function renderCharts(s) {
+  if (blinkChart) blinkChart.destroy();
+  if (eyeChart)   eyeChart.destroy();
+  if (hrChart)    hrChart.destroy();
+
+  const grid = 'rgba(255,255,255,0.04)';
+  const tick = '#5c6480';
+  const base = () => ({
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ display:false } },
+    scales:{
+      x:{ ticks:{ color:tick, font:{size:9}, maxTicksLimit:8 }, grid:{ color:grid } },
+      y:{ ticks:{ color:tick, font:{size:9}, maxTicksLimit:5 }, grid:{ color:grid } }
+    }
+  });
+
+  // Blink
+  const bd = s.blink_timeline || [];
+  blinkChart = new Chart(document.getElementById('blinkChart'), {
+    type:'bar',
+    data:{
+      labels: bd.map((_,i) => `${i*5}s`),
+      datasets:[{ data:bd, backgroundColor:'rgba(59,130,246,0.7)', borderRadius:4, barThickness:'flex' }]
+    },
+    options:{ ...base(), scales:{...base().scales, y:{ ...base().scales.y, beginAtZero:true }} }
+  });
+
+  // Eye
+  const ed = s.gaze_x_series || [];
+  eyeChart = new Chart(document.getElementById('eyeChart'), {
+    type:'line',
+    data:{
+      labels: ed.map((_,i)=>i),
+      datasets:[{ data:ed, borderColor:'#f59e0b', borderWidth:1.5, pointRadius:0, tension:0.3, fill:false }]
+    },
+    options: base()
+  });
+
+  // rPPG
+  const hd = s.rppg_waveform || [];
+  hrChart = new Chart(document.getElementById('hrChart'), {
+    type:'line',
+    data:{
+      labels: hd.map((_,i)=>i),
+      datasets:[{
+        data: hd,
+        borderColor: s.has_heartbeat ? '#22c55e' : '#5c6480',
+        borderWidth:1.5, pointRadius:0, tension:0.4, fill:false
+      }]
+    },
+    options: base()
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  ERROR / RESET
+// ═══════════════════════════════════════════════════════════
+function showError(msg) {
+  const b = document.getElementById('errorBox');
+  b.innerHTML = `<span>⚠</span> ${msg}`;
+  b.style.display = 'flex';
+}
+function hideError() {
+  document.getElementById('errorBox').style.display = 'none';
+}
+
+// ═══════════════════════════════════════════════════════════
+//  DOWNLOAD PDF
+// ═══════════════════════════════════════════════════════════
+async function downloadPDF() {
+  if (!lastResult) return;
+
+  const btn = document.getElementById('downloadBtn');
+  const origText = btn.innerHTML;
+  btn.disabled = true;
+  btn.classList.add('loading');
+  btn.innerHTML = '⏳ &nbsp;Generating PDF…';
+
+  try {
+    const res = await fetch(`${API_BASE}/export`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ result: lastResult, filename: lastFilename }),
+    });
+
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw new Error(e.error || `Server returned ${res.status}`);
+    }
+
+    // Stream response as blob and trigger browser download
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+
+    // Derive filename: original video name + _deepfake_report.pdf
+    const base = lastFilename.replace(/\.[^.]+$/, '').replace(/\s+/g, '_');
+    a.href     = url;
+    a.download = `${base}_deepfake_report.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    btn.innerHTML = '✓ &nbsp;Downloaded!';
+    setTimeout(() => {
+      btn.innerHTML = origText;
+      btn.disabled  = false;
+      btn.classList.remove('loading');
+    }, 2500);
+
+  } catch (err) {
+    btn.innerHTML = origText;
+    btn.disabled  = false;
+    btn.classList.remove('loading');
+    showError('PDF export failed: ' + err.message);
+  }
+}
+
+function resetAll() {
+  selectedFile = null;
+  fileInput.value = '';
+
+  // Reset UI state
+  document.getElementById('resultsSection').style.display  = 'none';
+  document.getElementById('progressSection').style.display = 'none';
+  fileInfoRow.style.display = 'none';
+  analyzeBtn.style.display  = 'none';
+  analyzeBtn.disabled       = false;
+  analyzeBtn.textContent    = '🔍  Analyze Video';
+
+  // Restore upload area
+  uploadArea.style.display  = 'block';
+  uploadArea.classList.remove('has-file');
+  uploadArea.querySelector('.upload-icon-wrap').style.display = 'flex';
+  uploadArea.querySelector('h3').style.display  = '';
+  uploadArea.querySelector('p').style.display   = '';
+  uploadArea.querySelector('.upload-formats').style.display = 'flex';
+  browseBtn.style.display = '';
+
+  document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('progressPct').textContent  = '0%';
+  document.getElementById('confBar').style.width = '0%';
+  hideError();
+
+  if (blinkChart) { blinkChart.destroy(); blinkChart = null; }
+  if (eyeChart)   { eyeChart.destroy();   eyeChart   = null; }
+  if (hrChart)    { hrChart.destroy();    hrChart    = null; }
+}
+</script>
+</body>
+</html>
